@@ -369,9 +369,6 @@ if collect_naver:
             text_block += f"△{row['매체']}/{clean_title}\n-{row['본문']}\n\n"
         st.code(text_block.strip(), language="markdown")
         st.caption("✅ 복사 버튼을 눌러 선택한 기사 내용을 복사하세요.")
-        else:
-            if articles:
-                st.subheader("📋 복사용 텍스트 (선택된 기사 없음)")
     else:
         if articles:
             st.subheader("📋 복사용 텍스트 (선택된 기사 없음)")
