@@ -335,7 +335,13 @@ if collect_wire:
             # 체크박스 상태가 True라면 expander도 True로!
             if st.session_state.get(checkbox_key, False):
                 st.session_state[expander_key] = True
-        
+
+            # 매 기사별로 일치 키워드 추출
+            if "content" in art:
+                matched_kw = [kw for kw in selected_keywords if kw in art["content"]]
+            else:
+                matched_kw = []
+
             with st.expander(art["title"], expanded=st.session_state[expander_key]):
                 is_selected = st.checkbox("이 기사 선택", key=checkbox_key)
                 st.markdown(f"[원문 보기]({art['url']})")
@@ -353,7 +359,7 @@ if collect_wire:
                 text_block += f"△{row['title']}\n-{row['content'].strip()}\n\n"
             st.code(text_block.strip(), language="markdown")
             st.caption("✅ 복사 버튼을 눌러 선택한 기사 내용을 복사하세요.")
-        elif articles:  # 여기 else를 elif로!
+        elif articles:
             st.subheader("📋 복사용 텍스트 (선택된 기사 없음)")
             st.info("체크박스로 기사 선택 시 이 영역에 텍스트가 표시됩니다.")
 
@@ -393,4 +399,3 @@ if collect_naver:
     elif naver_articles:
         st.subheader("📋 복사용 텍스트 (선택된 기사 없음)")
         st.info("체크박스로 기사 선택 시 이 영역에 텍스트가 표시됩니다.")
-
