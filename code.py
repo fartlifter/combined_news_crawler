@@ -338,7 +338,7 @@ if collect_wire:
             st.subheader("📋 복사용 텍스트 (선택된 기사만)")
             text_block = "【사회면】\n"
             for row in selected_articles:
-                text_block += f"△{row['source']}/{row['title']}\n-{row['content'].strip()}\n\n"
+                text_block += f"△{row['title']}\n-{row['content'].strip()}\n\n"
             st.code(text_block.strip(), language="markdown")
             st.caption("✅ 복사 버튼을 눌러 선택한 기사 내용을 복사하세요.")
         else:
