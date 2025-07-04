@@ -41,7 +41,6 @@ keyword_groups = {
     ]
 }
 
-# === 공통 입력부 ===
 now = datetime.now(ZoneInfo("Asia/Seoul"))
 col1, col2 = st.columns(2)
 with col1:
@@ -57,127 +56,271 @@ selected_keywords = [kw for g in selected_groups for kw in keyword_groups[g]]
 start_dt = datetime.combine(start_date, start_time).replace(tzinfo=ZoneInfo("Asia/Seoul"))
 end_dt = datetime.combine(end_date, end_time).replace(tzinfo=ZoneInfo("Asia/Seoul"))
 
-tab1, tab2 = st.tabs(["◆통신기사", "◆단독기사"])
+# === 기능 선택부 ===
+collect_wire = st.checkbox("연합뉴스/뉴시스 통신기사 수집", value=True)
+collect_naver = st.checkbox("[단독] 네이버 뉴스 수집", value=True)
 
-# --------------------------------------------------------------------------------
-# === 연합뉴스/뉴시스 통신기사 탭 ===
-with tab1:
-    st.subheader("연합뉴스/뉴시스 통신기사 수집")
-    # 세션 상태 초기화
-    if "wire_articles" not in st.session_state:
-        st.session_state.wire_articles = []
+# === 세션 상태 초기화 ===
+if "wire_articles" not in st.session_state:
+    st.session_state.wire_articles = []
+for key in ["naver_articles", "naver_status_text", "naver_progress"]:
+    if key not in st.session_state:
+        st.session_state[key] = [] if key == "naver_articles" else 0 if key == "naver_progress" else ""
 
-    progress_placeholder = st.empty()
-    status_placeholder = st.empty()
+# === 통신기사 함수들 ===
+def highlight_keywords(text, keywords):
+    for kw in keywords:
+        text = re.sub(f"({re.escape(kw)})", r'<mark style="background-color: #fffb91">\1</mark>', text)
+    return text
 
-    def highlight_keywords(text, keywords):
-        for kw in keywords:
-            text = re.sub(f"({re.escape(kw)})", r'<mark style="background-color: #fffb91">\1</mark>', text)
-        return text
+def get_content(url, selector):
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            res = client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            soup = BeautifulSoup(res.text, "html.parser")
+            content = soup.select_one(selector)
+            return content.get_text(separator="\n", strip=True) if content else ""
+    except:
+        return ""
 
-    def get_content(url, selector):
+def fetch_articles_concurrently(article_list, selector):
+    results = []
+    progress_bar = st.progress(0.0, text="본문 수집 중...")
+    total = len(article_list)
+    with ThreadPoolExecutor(max_workers=30) as executor:
+        futures = {executor.submit(get_content, art['url'], selector): art for art in article_list}
+        for i, future in enumerate(as_completed(futures)):
+            art = futures[future]
+            try:
+                content = future.result()
+                if any(kw in content for kw in selected_keywords):
+                    art['content'] = content
+                    results.append(art)
+            except:
+                continue
+            progress_bar.progress((i + 1) / total, text=f"{i+1}/{total} 기사 처리 완료")
+    progress_bar.empty()
+    return results
+
+def parse_yonhap():
+    collected, page = [], 1
+    st.info("🔍 [연합뉴스] 기사 목록 수집 중...")
+    while True:
+        url = f"https://www.yna.co.kr/news/{page}?site=navi_latest_depth01"
+        res = httpx.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5.0)
+        soup = BeautifulSoup(res.text, "html.parser")
+        items = soup.select("ul.list01 > li[data-cid]")
+        if not items:
+            break
+        for item in items:
+            cid = item.get("data-cid")
+            title_tag = item.select_one(".title01")
+            time_tag = item.select_one(".txt-time")
+            if not (cid and title_tag and time_tag):
+                continue
+            try:
+                dt = datetime.strptime(f"{start_dt.year}-{time_tag.text.strip()}", "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("Asia/Seoul"))
+            except:
+                continue
+            if dt < start_dt:
+                return fetch_articles_concurrently(collected, "div.story-news.article")
+            if start_dt <= dt <= end_dt:
+                collected.append({
+                    "source": "연합뉴스", "datetime": dt, "title": title_tag.text.strip(),
+                    "url": f"https://www.yna.co.kr/view/{cid}"
+                })
+        page += 1
+    return fetch_articles_concurrently(collected, "div.story-news.article")
+
+def parse_newsis():
+    collected, page = [], 1
+    st.info("🔍 [뉴시스] 기사 목록 수집 중...")
+    while True:
+        url = f"https://www.newsis.com/realnews/?cid=realnews&day=today&page={page}"
+        res = httpx.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5.0)
+        soup = BeautifulSoup(res.text, "html.parser")
+        items = soup.select("ul.articleList2 > li")
+        if not items:
+            break
+        for item in items:
+            title_tag = item.select_one("p.tit > a")
+            time_tag = item.select_one("p.time")
+            if not (title_tag and time_tag):
+                continue
+            title = title_tag.get_text(strip=True)
+            href = title_tag.get("href", "")
+            match = re.search(r"\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2}", time_tag.text)
+            if not match:
+                continue
+            dt = datetime.strptime(match.group(), "%Y.%m.%d %H:%M:%S").replace(tzinfo=ZoneInfo("Asia/Seoul"))
+            if dt < start_dt:
+                return fetch_articles_concurrently(collected, "div.viewer")
+            if start_dt <= dt <= end_dt:
+                collected.append({
+                    "source": "뉴시스", "datetime": dt, "title": title,
+                    "url": "https://www.newsis.com" + href
+                })
+        page += 1
+    return fetch_articles_concurrently(collected, "div.viewer")
+
+# === 네이버 단독기사 함수들 ===
+def naver_parse_pubdate(pubdate_str):
+    try:
+        return datetime.strptime(pubdate_str, "%a, %d %b %Y %H:%M:%S %z")
+    except:
+        return None
+
+def naver_extract_title_and_body(url):
+    try:
+        if "n.news.naver.com" not in url:
+            return None, None
+        html = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        if html.status_code != 200:
+            return None, None
+        soup = BeautifulSoup(html.text, "html.parser")
+        title_div = soup.find("div", class_="media_end_head_title")
+        content_div = soup.find("div", id="newsct_article")
+        title = title_div.get_text(strip=True) if title_div else None
+        body = content_div.get_text(separator="\n", strip=True) if content_div else None
+        return title, body
+    except:
+        return None, None
+
+def naver_extract_media_name(url):
+    try:
+        domain = url.split("//")[-1].split("/")[0]
+        parts = domain.split(".")
+        if len(parts) >= 3:
+            composite_key = f"{parts[-3]}.{parts[-2]}"
+        else:
+            composite_key = parts[0]
+        media_mapping = {
+            "chosun": "조선", "joongang": "중앙", "donga": "동아", "hani": "한겨레",
+            "khan": "경향", "hankookilbo": "한국", "segye": "세계", "seoul": "서울",
+            "kmib": "국민", "munhwa": "문화", "kbs": "KBS", "sbs": "SBS",
+            "imnews": "MBC", "jtbc": "JTBC", "ichannela": "채널A", "tvchosun": "TV조선",
+            "mk": "매경", "sedaily": "서경", "hankyung": "한경", "news1": "뉴스1",
+            "newsis": "뉴시스", "yna": "연합", "mt": "머투", "weekly": "주간조선",
+            "biz.chosun": "조선비즈", "fnnews": "파뉴", "etoday.co": "이투데이", "edaily.co": "이데일리", "tf.co": "더팩트", 
+            "yonhapnewstv.co": "연뉴TV", "ytn.co": "YTN", "nocutnews.co": "노컷", "biz.heraldcorp": "헤경",
+            "sisajournal.com": "시사저널", "www.ohmynews": "오마이", "dailian.co": "데일리안", "ilyo.co": "일요신문", "sisain.co": "시사IN"
+        }
+        if composite_key in media_mapping:
+            return media_mapping[composite_key]
+        for part in reversed(parts):
+            if part in media_mapping:
+                return media_mapping[part]
+        return composite_key.upper()
+    except:
+        return "[매체추출실패]"
+
+def naver_safe_api_request(url, headers, params, max_retries=3):
+    for _ in range(max_retries):
         try:
-            with httpx.Client(timeout=5.0) as client:
-                res = client.get(url, headers={"User-Agent": "Mozilla/5.0"})
-                soup = BeautifulSoup(res.text, "html.parser")
-                content = soup.select_one(selector)
-                return content.get_text(separator="\n", strip=True) if content else ""
+            res = requests.get(url, headers=headers, params=params, timeout=5)
+            if res.status_code == 200:
+                return res
+            t.sleep(0.5)
         except:
-            return ""
+            t.sleep(0.5)
+    return res
 
-    def fetch_articles_concurrently(article_list, selector):
-        results = []
-        progress_bar = progress_placeholder.progress(0.0, text="본문 수집 중...")
-        total = len(article_list)
-        with ThreadPoolExecutor(max_workers=30) as executor:
-            futures = {executor.submit(get_content, art['url'], selector): art for art in article_list}
-            for i, future in enumerate(as_completed(futures)):
-                art = futures[future]
-                try:
-                    content = future.result()
-                    if any(kw in content for kw in selected_keywords):
-                        art['content'] = content
-                        results.append(art)
-                except:
-                    continue
-                progress_bar.progress((i + 1) / total, text=f"{i+1}/{total} 기사 처리 완료")
-        progress_placeholder.empty()
-        return results
+def naver_fetch_and_filter(item_data):
+    item, start_dt, end_dt, selected_keywords, use_keyword_filter = item_data
+    link = item.get("link")
+    if not link or "n.news.naver.com" not in link:
+        return None
 
-    def parse_yonhap():
-        collected, page = [], 1
-        status_placeholder.info("🔍 [연합뉴스] 기사 목록 수집 중...")
-        while True:
-            url = f"https://www.yna.co.kr/news/{page}?site=navi_latest_depth01"
-            res = httpx.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5.0)
-            soup = BeautifulSoup(res.text, "html.parser")
-            items = soup.select("ul.list01 > li[data-cid]")
-            if not items:
-                break
-            for item in items:
-                cid = item.get("data-cid")
-                title_tag = item.select_one(".title01")
-                time_tag = item.select_one(".txt-time")
-                if not (cid and title_tag and time_tag):
-                    continue
-                try:
-                    dt = datetime.strptime(f"{start_dt.year}-{time_tag.text.strip()}", "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo("Asia/Seoul"))
-                except:
-                    continue
-                if dt < start_dt:
-                    return fetch_articles_concurrently(collected, "div.story-news.article")
-                if start_dt <= dt <= end_dt:
-                    collected.append({
-                        "source": "연합뉴스", "datetime": dt, "title": title_tag.text.strip(),
-                        "url": f"https://www.yna.co.kr/view/{cid}"
-                    })
-            page += 1
-        return fetch_articles_concurrently(collected, "div.story-news.article")
+    title, body = naver_extract_title_and_body(link)
+    if not title or "[단독]" not in title or not body:
+        return None
 
-    def parse_newsis():
-        collected, page = [], 1
-        status_placeholder.info("🔍 [뉴시스] 기사 목록 수집 중...")
-        while True:
-            url = f"https://www.newsis.com/realnews/?cid=realnews&day=today&page={page}"
-            res = httpx.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5.0)
-            soup = BeautifulSoup(res.text, "html.parser")
-            items = soup.select("ul.articleList2 > li")
-            if not items:
-                break
-            for item in items:
-                title_tag = item.select_one("p.tit > a")
-                time_tag = item.select_one("p.time")
-                if not (title_tag and time_tag):
-                    continue
-                title = title_tag.get_text(strip=True)
-                href = title_tag.get("href", "")
-                match = re.search(r"\d{4}\.\d{2}\.\d{2} \d{2}:\d{2}:\d{2}", time_tag.text)
-                if not match:
-                    continue
-                dt = datetime.strptime(match.group(), "%Y.%m.%d %H:%M:%S").replace(tzinfo=ZoneInfo("Asia/Seoul"))
-                if dt < start_dt:
-                    return fetch_articles_concurrently(collected, "div.viewer")
-                if start_dt <= dt <= end_dt:
-                    collected.append({
-                        "source": "뉴시스", "datetime": dt, "title": title,
-                        "url": "https://www.newsis.com" + href
-                    })
-            page += 1
-        return fetch_articles_concurrently(collected, "div.viewer")
+    pub_dt = naver_parse_pubdate(item.get("pubDate"))
+    if not pub_dt or not (start_dt <= pub_dt <= end_dt):
+        return None
 
-    # === 수집 버튼 ===
-    if st.button("📥 통신기사 수집 시작"):
-        status_placeholder.info("기사 수집을 시작합니다...")
+    matched_keywords = []
+    if use_keyword_filter and selected_keywords:
+        matched_keywords = [kw for kw in selected_keywords if kw in body]
+        if not matched_keywords:
+            return None
+
+    highlighted_body = body
+    for kw in matched_keywords:
+        highlighted_body = highlighted_body.replace(kw, f"<mark>{kw}</mark>")
+    highlighted_body = highlighted_body.replace("\n", "<br><br>")
+    media = naver_extract_media_name(item.get("originallink", ""))
+
+    return {
+        "키워드": "[단독]",
+        "매체": media,
+        "제목": title,
+        "날짜": pub_dt.strftime("%Y-%m-%d %H:%M:%S"),
+        "본문": body,
+        "필터일치": ", ".join(matched_keywords),
+        "링크": link,
+        "하이라이트": highlighted_body,
+        "pub_dt": pub_dt
+    }
+
+# === 수집 버튼 ===
+if st.button("✅ 기사 수집 시작"):
+    if collect_wire:
+        st.info("통신기사 수집 중...")
         newsis_articles = parse_newsis()
         yonhap_articles = parse_yonhap()
         st.session_state.wire_articles = newsis_articles + yonhap_articles
-        status_placeholder.success(f"✅ 총 {len(st.session_state.wire_articles)}건의 기사를 수집했습니다.")
+        st.success(f"✅ 통신기사 {len(st.session_state.wire_articles)}건 수집 완료")
 
-    # === 기사 표시 및 선택
+    if collect_naver:
+        use_keyword_filter = st.checkbox("📎 키워드 포함 기사만 필터링", value=True, key="naver_filter_run")
+        st.info("단독기사 수집 중...")
+        headers = {
+            "X-Naver-Client-Id": client_id,
+            "X-Naver-Client-Secret": client_secret
+        }
+        seen_links = set()
+        all_articles = []
+        total = 0
+
+        for start_index in range(1, 1001, 100):
+            progress = start_index / 1000
+            st.progress(progress, text=f"단독기사 {total}건 수집 중")
+            params = {
+                "query": "[단독]",
+                "sort": "date",
+                "display": 100,
+                "start": start_index
+            }
+            res = naver_safe_api_request("https://openapi.naver.com/v1/search/news.json", headers, params)
+            if res.status_code != 200:
+                st.warning(f"API 호출 실패: {res.status_code}")
+                break
+            items = res.json().get("items", [])
+            if not items:
+                break
+
+            with ThreadPoolExecutor(max_workers=25) as executor:
+                futures = [
+                    executor.submit(naver_fetch_and_filter, (item, start_dt, end_dt, selected_keywords, use_keyword_filter))
+                    for item in items
+                ]
+                for future in as_completed(futures):
+                    result = future.result()
+                    if result and result["링크"] not in seen_links:
+                        seen_links.add(result["링크"])
+                        all_articles.append(result)
+                        total += 1
+
+        st.session_state["naver_articles"] = all_articles
+        st.success(f"✅ 단독기사 {len(all_articles)}건 수집 완료")
+
+# === 결과 출력 ===
+if collect_wire:
+    st.header("◆ 연합뉴스/뉴시스 통신기사 결과")
     selected_articles = []
     articles = st.session_state.wire_articles
     if articles:
-        st.subheader("📰 기사 내용")
         for i, art in enumerate(articles):
             matched_kw = [kw for kw in selected_keywords if "content" in art and kw in art["content"]]
             with st.expander(art["title"], expanded=False):
@@ -189,186 +332,20 @@ with tab1:
                     st.markdown(highlight_keywords(art["content"], matched_kw).replace("\n", "<br>"), unsafe_allow_html=True)
                 if is_selected:
                     selected_articles.append(art)
+        if selected_articles:
+            st.subheader("📋 복사용 텍스트 (선택된 기사만)")
+            text_block = ""
+            for row in selected_articles:
+                text_block += f"△{row['source']}/{row['title']}\n-{row['content'].strip()}\n\n"
+            st.code(text_block.strip(), language="markdown")
+            st.caption("✅ 복사 버튼을 눌러 선택한 기사 내용을 복사하세요.")
+        else:
+            if articles:
+                st.subheader("📋 복사용 텍스트 (선택된 기사 없음)")
+                st.info("체크박스로 기사 선택 시 이 영역에 텍스트가 표시됩니다.")
 
-    # === 복사용 텍스트 박스
-    if selected_articles:
-        st.subheader("📋 복사용 텍스트 (선택된 기사만)")
-        text_block = ""
-        for row in selected_articles:
-            text_block += f"△{row['source']}/{row['title']}\n-{row['content'].strip()}\n\n"
-        st.code(text_block.strip(), language="markdown")
-        st.caption("✅ 복사 버튼을 눌러 선택한 기사 내용을 복사하세요.")
-    else:
-        if articles:
-            st.subheader("📋 복사용 텍스트 (선택된 기사 없음)")
-            st.info("체크박스로 기사 선택 시 이 영역에 텍스트가 표시됩니다.")
-
-# --------------------------------------------------------------------------------
-# === [단독] 네이버 뉴스 탭 ===
-with tab2:
-    st.subheader("[단독] 네이버 뉴스 수집")
-    use_keyword_filter = st.checkbox("📎 키워드 포함 기사만 필터링", value=True, key="naver_filter")
-
-    # 세션 상태 초기화
-    for key in ["naver_articles", "naver_status_text", "naver_progress"]:
-        if key not in st.session_state:
-            st.session_state[key] = [] if key == "naver_articles" else 0 if key == "naver_progress" else ""
-
-    # --- 네이버 뉴스 본문/메타 정보 추출 함수 ---
-    def naver_parse_pubdate(pubdate_str):
-        try:
-            return datetime.strptime(pubdate_str, "%a, %d %b %Y %H:%M:%S %z")
-        except:
-            return None
-
-    def naver_extract_title_and_body(url):
-        try:
-            if "n.news.naver.com" not in url:
-                return None, None
-            html = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-            if html.status_code != 200:
-                return None, None
-            soup = BeautifulSoup(html.text, "html.parser")
-            title_div = soup.find("div", class_="media_end_head_title")
-            content_div = soup.find("div", id="newsct_article")
-            title = title_div.get_text(strip=True) if title_div else None
-            body = content_div.get_text(separator="\n", strip=True) if content_div else None
-            return title, body
-        except:
-            return None, None
-
-    def naver_extract_media_name(url):
-        try:
-            domain = url.split("//")[-1].split("/")[0]
-            parts = domain.split(".")
-            if len(parts) >= 3:
-                composite_key = f"{parts[-3]}.{parts[-2]}"
-            else:
-                composite_key = parts[0]
-            media_mapping = {
-                "chosun": "조선", "joongang": "중앙", "donga": "동아", "hani": "한겨레",
-                "khan": "경향", "hankookilbo": "한국", "segye": "세계", "seoul": "서울",
-                "kmib": "국민", "munhwa": "문화", "kbs": "KBS", "sbs": "SBS",
-                "imnews": "MBC", "jtbc": "JTBC", "ichannela": "채널A", "tvchosun": "TV조선",
-                "mk": "매경", "sedaily": "서경", "hankyung": "한경", "news1": "뉴스1",
-                "newsis": "뉴시스", "yna": "연합", "mt": "머투", "weekly": "주간조선",
-                "biz.chosun": "조선비즈", "fnnews": "파뉴", "etoday.co": "이투데이", "edaily.co": "이데일리", "tf.co": "더팩트", 
-                "yonhapnewstv.co": "연뉴TV", "ytn.co": "YTN", "nocutnews.co": "노컷", "biz.heraldcorp": "헤경",
-                "sisajournal.com": "시사저널", "www.ohmynews": "오마이", "dailian.co": "데일리안", "ilyo.co": "일요신문", "sisain.co": "시사IN"
-            }
-            if composite_key in media_mapping:
-                return media_mapping[composite_key]
-            for part in reversed(parts):
-                if part in media_mapping:
-                    return media_mapping[part]
-            return composite_key.upper()
-        except:
-            return "[매체추출실패]"
-
-    def naver_safe_api_request(url, headers, params, max_retries=3):
-        for _ in range(max_retries):
-            try:
-                res = requests.get(url, headers=headers, params=params, timeout=5)
-                if res.status_code == 200:
-                    return res
-                t.sleep(0.5)
-            except:
-                t.sleep(0.5)
-        return res
-
-    def naver_fetch_and_filter(item_data):
-        item, start_dt, end_dt, selected_keywords, use_keyword_filter = item_data
-        link = item.get("link")
-        if not link or "n.news.naver.com" not in link:
-            return None
-
-        title, body = naver_extract_title_and_body(link)
-        if not title or "[단독]" not in title or not body:
-            return None
-
-        pub_dt = naver_parse_pubdate(item.get("pubDate"))
-        if not pub_dt or not (start_dt <= pub_dt <= end_dt):
-            return None
-
-        matched_keywords = []
-        if use_keyword_filter and selected_keywords:
-            matched_keywords = [kw for kw in selected_keywords if kw in body]
-            if not matched_keywords:
-                return None
-
-        highlighted_body = body
-        for kw in matched_keywords:
-            highlighted_body = highlighted_body.replace(kw, f"<mark>{kw}</mark>")
-        highlighted_body = highlighted_body.replace("\n", "<br><br>")
-        media = naver_extract_media_name(item.get("originallink", ""))
-
-        return {
-            "키워드": "[단독]",
-            "매체": media,
-            "제목": title,
-            "날짜": pub_dt.strftime("%Y-%m-%d %H:%M:%S"),
-            "본문": body,
-            "필터일치": ", ".join(matched_keywords),
-            "링크": link,
-            "하이라이트": highlighted_body,
-            "pub_dt": pub_dt
-        }
-
-    status_placeholder = st.empty()
-    progress_bar = st.progress(st.session_state["naver_progress"])
-    status_placeholder.markdown(st.session_state["naver_status_text"])
-
-    # === 수집 버튼 ===
-    if st.button("✅ [단독] 뉴스 수집 시작"):
-        with st.spinner("뉴스 수집 중..."):
-            headers = {
-                "X-Naver-Client-Id": client_id,
-                "X-Naver-Client-Secret": client_secret
-            }
-            seen_links = set()
-            all_articles = []
-            total = 0
-
-            for start_index in range(1, 1001, 100):
-                progress = start_index / 1000
-                st.session_state["naver_progress"] = progress
-                progress_bar.progress(progress)
-                st.session_state["naver_status_text"] = f"🟡 수집 중... {total}건 수집됨"
-                status_placeholder.markdown(st.session_state["naver_status_text"])
-
-                params = {
-                    "query": "[단독]",
-                    "sort": "date",
-                    "display": 100,
-                    "start": start_index
-                }
-                res = naver_safe_api_request("https://openapi.naver.com/v1/search/news.json", headers, params)
-                if res.status_code != 200:
-                    st.warning(f"API 호출 실패: {res.status_code}")
-                    break
-                items = res.json().get("items", [])
-                if not items:
-                    break
-
-                with ThreadPoolExecutor(max_workers=25) as executor:
-                    futures = [
-                        executor.submit(naver_fetch_and_filter, (item, start_dt, end_dt, selected_keywords, use_keyword_filter))
-                        for item in items
-                    ]
-                    for future in as_completed(futures):
-                        result = future.result()
-                        if result and result["링크"] not in seen_links:
-                            seen_links.add(result["링크"])
-                            all_articles.append(result)
-                            total += 1
-
-            st.session_state["naver_articles"] = all_articles
-            st.session_state["naver_status_text"] = f"✅ 수집 완료: 총 {len(all_articles)}건"
-            st.session_state["naver_progress"] = 1.0
-            status_placeholder.markdown(st.session_state["naver_status_text"])
-            progress_bar.progress(1.0)
-
-    # === 기사 표시 및 체크박스 ===
+if collect_naver:
+    st.header("◆ [단독] 네이버 뉴스 결과")
     selected_naver_articles = []
     for idx, result in enumerate(st.session_state["naver_articles"]):
         with st.expander(f"{result['매체']}/{result['제목']}", expanded=False):
@@ -380,8 +357,6 @@ with tab2:
             st.markdown(f"- {result['하이라이트']}", unsafe_allow_html=True)
             if is_selected:
                 selected_naver_articles.append(result)
-
-    # === 복사 박스 ===
     if selected_naver_articles:
         text_block = ""
         for row in selected_naver_articles:
