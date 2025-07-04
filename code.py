@@ -328,11 +328,8 @@ if collect_wire:
             matched_kw = [kw for kw in selected_keywords if "content" in art and kw in art["content"]]
             expander_key = f"wire_expander_{i}"
             checkbox_key = f"wire_{i}"
-            # 세션에 expander 상태가 없으면 False(닫힘)로 초기화
-            if expander_key not in st.session_state:
-                st.session_state[expander_key] = False
 
-            with st.expander(art["title"], expanded=st.session_state[expander_key]):
+            with st.expander(art["title"]:
                 is_selected = st.checkbox("이 기사 선택", key=checkbox_key)
                 st.markdown(f"[원문 보기]({art['url']})")
                 dt_str = art["datetime"].strftime('%Y-%m-%d %H:%M') if "datetime" in art else ""
@@ -362,10 +359,8 @@ if collect_naver:
     for idx, result in enumerate(naver_articles):
         expander_key = f"naver_expander_{idx}"
         checkbox_key = f"naver_chk_{idx}"
-        if expander_key not in st.session_state:
-            st.session_state[expander_key] = False
 
-        with st.expander(f"{result['매체']}/{result['제목']}", expanded=st.session_state[expander_key]):
+        with st.expander(f"{result['매체']}/{result['제목']}":
             is_selected = st.checkbox("이 기사 선택", key=checkbox_key)
             st.markdown(f"[🔗 원문 보기]({result['링크']})", unsafe_allow_html=True)
             st.caption(result["날짜"])
