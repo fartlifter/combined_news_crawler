@@ -362,9 +362,17 @@ if collect_naver:
             if is_selected:
                 selected_naver_articles.append(result)
     if selected_naver_articles:
+        st.subheader("📋 복사용 텍스트 (선택된 기사만)")
         text_block = "【타지】\n"
         for row in selected_naver_articles:
             clean_title = re.sub(r"\[단독\]|\(단독\)|【단독】|ⓧ단독|^단독\s*[:-]?", "", row['제목']).strip()
             text_block += f"△{row['매체']}/{clean_title}\n-{row['본문']}\n\n"
         st.code(text_block.strip(), language="markdown")
         st.caption("✅ 복사 버튼을 눌러 선택한 기사 내용을 복사하세요.")
+        else:
+            if articles:
+                st.subheader("📋 복사용 텍스트 (선택된 기사 없음)")
+    else:
+        if articles:
+            st.subheader("📋 복사용 텍스트 (선택된 기사 없음)")
+            st.info("체크박스로 기사 선택 시 이 영역에 텍스트가 표시됩니다.")
