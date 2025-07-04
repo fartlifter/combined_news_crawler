@@ -57,8 +57,8 @@ start_dt = datetime.combine(start_date, start_time).replace(tzinfo=ZoneInfo("Asi
 end_dt = datetime.combine(end_date, end_time).replace(tzinfo=ZoneInfo("Asia/Seoul"))
 
 # === 기능 선택부 ===
-collect_wire = st.checkbox("연합뉴스/뉴시스 통신기사 수집", value=True)
-collect_naver = st.checkbox("[단독] 네이버 뉴스 수집", value=True)
+collect_wire = st.checkbox("통신기사", value=True)
+collect_naver = st.checkbox("단독기사", value=True)
 
 # === 세션 상태 초기화 ===
 if "wire_articles" not in st.session_state:
@@ -317,7 +317,7 @@ if st.button("✅ 기사 수집 시작"):
 
 # === 결과 출력 ===
 if collect_wire:
-    st.header("◆ 연합뉴스/뉴시스 통신기사 결과")
+    st.header("◆통신기사")
     selected_articles = []
     articles = st.session_state.wire_articles
     if articles:
@@ -334,7 +334,7 @@ if collect_wire:
                     selected_articles.append(art)
         if selected_articles:
             st.subheader("📋 복사용 텍스트 (선택된 기사만)")
-            text_block = ""
+            text_block = "【사회면】"
             for row in selected_articles:
                 text_block += f"△{row['source']}/{row['title']}\n-{row['content'].strip()}\n\n"
             st.code(text_block.strip(), language="markdown")
@@ -345,7 +345,7 @@ if collect_wire:
                 st.info("체크박스로 기사 선택 시 이 영역에 텍스트가 표시됩니다.")
 
 if collect_naver:
-    st.header("◆ [단독] 네이버 뉴스 결과")
+    st.header("◆단독기사")
     selected_naver_articles = []
     for idx, result in enumerate(st.session_state["naver_articles"]):
         with st.expander(f"{result['매체']}/{result['제목']}", expanded=False):
@@ -358,7 +358,7 @@ if collect_naver:
             if is_selected:
                 selected_naver_articles.append(result)
     if selected_naver_articles:
-        text_block = ""
+        text_block = "【타지】"
         for row in selected_naver_articles:
             clean_title = re.sub(r"\[단독\]|\(단독\)|【단독】|ⓧ단독|^단독\s*[:-]?", "", row['제목']).strip()
             text_block += f"△{row['매체']}/{clean_title}\n-{row['본문']}\n\n"
