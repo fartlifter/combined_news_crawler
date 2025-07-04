@@ -282,10 +282,12 @@ if st.button("✅ 기사 수집 시작"):
         seen_links = set()
         all_articles = []
         total = 0
-
+        
+        progress_bar = st.empty() 
+        
         for start_index in range(1, 1001, 100):
             progress = start_index / 1000
-            st.progress(progress, text=f"단독기사 {total}건 수집 중")
+            progress_bar.progress(progress, text=f"단독기사 {total}건 수집 중")
             params = {
                 "query": "[단독]",
                 "sort": "date",
@@ -334,7 +336,7 @@ if collect_wire:
                     selected_articles.append(art)
         if selected_articles:
             st.subheader("📋 복사용 텍스트 (선택된 기사만)")
-            text_block = "【사회면】"
+            text_block = "【사회면】\n"
             for row in selected_articles:
                 text_block += f"△{row['source']}/{row['title']}\n-{row['content'].strip()}\n\n"
             st.code(text_block.strip(), language="markdown")
@@ -358,7 +360,7 @@ if collect_naver:
             if is_selected:
                 selected_naver_articles.append(result)
     if selected_naver_articles:
-        text_block = "【타지】"
+        text_block = "【타지】\n"
         for row in selected_naver_articles:
             clean_title = re.sub(r"\[단독\]|\(단독\)|【단독】|ⓧ단독|^단독\s*[:-]?", "", row['제목']).strip()
             text_block += f"△{row['매체']}/{clean_title}\n-{row['본문']}\n\n"
