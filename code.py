@@ -345,8 +345,6 @@ if collect_wire:
                     st.markdown(highlight_keywords(art["content"], matched_kw).replace("\n", "<br>"), unsafe_allow_html=True)
                 if is_selected:
                     selected_articles.append(art)
-                # 항상 열린 상태로 유지
-                st.session_state[expander_key] = True
 
         if selected_articles:
             st.subheader("📋 복사용 텍스트 (선택된 기사만)")
@@ -383,7 +381,6 @@ if collect_naver:
             st.markdown(f"- {result['하이라이트']}", unsafe_allow_html=True)
             if is_selected:
                 selected_naver_articles.append(result)
-            st.session_state[expander_key] = True
 
     if selected_naver_articles:
         st.subheader("📋 복사용 텍스트 (선택된 기사만)")
