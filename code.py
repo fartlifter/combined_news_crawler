@@ -313,7 +313,9 @@ if st.button("✅ 기사 수집 시작"):
                         seen_links.add(result["링크"])
                         all_articles.append(result)
                         total += 1
-
+                        
+        progress_bar.empty()
+        
         st.session_state["naver_articles"] = all_articles
         st.success(f"✅ 단독기사 {len(all_articles)}건 수집 완료")
 
