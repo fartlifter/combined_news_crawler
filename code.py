@@ -106,7 +106,7 @@ def parse_yonhap():
     collected, page = [], 1
     st.info("🔍 [연합뉴스] 기사 목록 수집 중...")
     while True:
-        url = f"https://www.yna.co.kr/news/{page}?site=navi_latest_depth01"
+        url = f"https://www.yna.co.kr/society/all/{page}"
         res = httpx.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5.0)
         soup = BeautifulSoup(res.text, "html.parser")
         items = soup.select("ul.list01 > li[data-cid]")
@@ -136,7 +136,7 @@ def parse_newsis():
     collected, page = [], 1
     st.info("🔍 [뉴시스] 기사 목록 수집 중...")
     while True:
-        url = f"https://www.newsis.com/realnews/?cid=realnews&day=today&page={page}"
+        url = f"https://www.newsis.com/society/list/?cid=10200&scid=10201&page={page}"
         res = httpx.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5.0)
         soup = BeautifulSoup(res.text, "html.parser")
         items = soup.select("ul.articleList2 > li")
