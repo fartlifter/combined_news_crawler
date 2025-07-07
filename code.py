@@ -14,7 +14,7 @@ client_secret = "49E810CBKY"
 
 st.set_page_config(page_title="단독·통신기사 수집기", layout="wide")
 st.title("📰 단독·통신기사 수집기")
-st.caption("세계일보 경찰팀 라인별 보고를 도와줍니다. (만든이: 윤준호, 업데이트: 250704)")
+st.caption("세계일보 경찰팀 라인별 보고를 도와줍니다. (만든이: 윤준호, 업데이트: 250707)")
 
 # === 키워드 그룹 (공통) ===
 keyword_groups = {
