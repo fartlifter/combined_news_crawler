@@ -22,8 +22,9 @@ keyword_groups = {
     '본청': ['경찰청'],
     '종혜북': [
         '종로', '종암', '성북', '고려대', '참여연대', '혜화', '동대문', '중랑',
-        '성균관대', '한국외대', '서울시립대', '경희대', '경실련', '서울대병원',
-        '노원', '강북', '도봉', '북부지법', '북부지검', '상계백병원', '국가인권위원회'
+        '성균관대', '한국외대', '서울시립대', '경희대', '경실련', '서울대병원', '국민대', 
+        '노원', '강북', '도봉', '북부지법', '북부지검', '상계백병원', '국가인권위원회',
+        '상명대', '배화여대', '한국예술종합학교', '한성대', '덕성여대'
     ],
     '마포중부': [
         '마포', '서대문', '서부', '은평', '서부지검', '서부지법', '연세대', '반부패범죄수사대', '공공범죄수사대',
@@ -197,10 +198,10 @@ def naver_extract_media_name(url):
         media_mapping = {
             "chosun": "조선", "joongang": "중앙", "donga": "동아", "hani": "한겨레",
             "khan": "경향", "hankookilbo": "한국", "segye": "세계", "seoul": "서울",
-            "kmib": "국민", "munhwa": "문화", "kbs": "KBS", "sbs": "SBS",
+            "kmib": "국민", "munhwa": "문화", "kbs": "KBS", "sbs": "SBS", "www.mbn": "MBN",
             "imnews": "MBC", "jtbc": "JTBC", "ichannela": "채널A", "tvchosun": "TV조선",
-            "mk": "매경", "sedaily": "서경", "hankyung": "한경", "news1": "뉴스1",
-            "newsis": "뉴시스", "yna": "연합", "mt": "머투", "weekly": "주간조선",
+            "mk": "매경", "sedaily": "서경", "hankyung": "한경", "news1": "뉴스1", "www.pressian": "프레시안", 
+            "newsis": "뉴시스", "yna": "연합", "mt": "머투", "weekly": "주간조선", "www.imaeil": "매일신문",
             "biz.chosun": "조선비즈", "fnnews": "파뉴", "etoday.co": "이투데이", "edaily.co": "이데일리", "tf.co": "더팩트", 
             "yonhapnewstv.co": "연뉴TV", "ytn.co": "YTN", "nocutnews.co": "노컷", "asiae.co": "아경", "biz.heraldcorp": "헤경",
             "www.sisajournal": "시사저널", "www.ohmynews": "오마이", "dailian.co": "데일리안", "ilyo.co": "일요신문", "sisain.co": "시사IN"
