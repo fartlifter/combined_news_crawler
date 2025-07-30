@@ -329,30 +329,33 @@ if collect_wire:
             expander_key = f"wire_expander_{i}"
             checkbox_key = f"wire_{i}"
         
-            # expander 초기값: 체크박스가 선택된 경우 True, 아니면 False
+            # 초기 상태 설정
             if expander_key not in st.session_state:
                 st.session_state[expander_key] = False
         
-            # 체크박스 상태가 True라면 expander도 True로!
+            # 기사 제목 + 체크박스를 한 줄에 나란히 출력
+            col1, col2 = st.columns([0.85, 0.15])
+            with col1:
+                st.markdown(f"**{art['title']}**")
+            with col2:
+                is_selected = st.checkbox("선택", key=checkbox_key)
+        
+            # 선택 여부에 따라 expander 열기
             if st.session_state.get(checkbox_key, False):
                 st.session_state[expander_key] = True
-
-            # 매 기사별로 일치 키워드 추출
-            if "content" in art:
-                matched_kw = [kw for kw in selected_keywords if kw in art["content"]]
-            else:
-                matched_kw = []
-
-            with st.expander(art["title"], expanded=st.session_state[expander_key]):
-                is_selected = st.checkbox("이 기사 선택", key=checkbox_key)
+        
+            # expander로 상세 내용 표시
+            with st.expander("내용 보기", expanded=st.session_state[expander_key]):
                 st.markdown(f"[원문 보기]({art['url']})")
                 dt_str = art["datetime"].strftime('%Y-%m-%d %H:%M') if "datetime" in art else ""
+                matched_kw = [kw for kw in selected_keywords if "content" in art and kw in art["content"]]
                 st.markdown(f"{art['source']} | {dt_str} | 필터링 키워드: {', '.join(matched_kw)}")
                 if "content" in art:
                     st.markdown(highlight_keywords(art["content"], matched_kw).replace("\n", "<br>"), unsafe_allow_html=True)
-                if is_selected:
-                    selected_articles.append(art)
-
+        
+            if is_selected:
+                selected_articles.append(art)
+                
         if selected_articles:
             st.subheader("📋 복사용 텍스트 (선택된 기사만)")
             text_block = "【사회면】\n"
