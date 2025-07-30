@@ -324,16 +324,16 @@ if collect_wire:
     st.header("◆통신기사")
     selected_articles = []
     articles = st.session_state.wire_articles
+    if articles:
         for i, art in enumerate(articles):
             expander_key = f"wire_expander_{i}"
             checkbox_key = f"wire_{i}"
-        
-            # 초기 확장 상태 설정
+
             if expander_key not in st.session_state:
                 st.session_state[expander_key] = False
-        
-            # 제목 + 체크박스를 한 줄에 표시 (비슷한 높이로)
-            col1, col2 = st.columns([0.92, 0.08])  # expander와 체크박스 너비 조절
+
+            # 제목과 체크박스를 같은 줄에 배치
+            col1, col2 = st.columns([0.92, 0.08])
             with col1:
                 with st.expander(art["title"], expanded=st.session_state[expander_key]):
                     st.markdown(f"[원문 보기]({art['url']})")
@@ -347,24 +347,11 @@ if collect_wire:
                         )
             with col2:
                 is_selected = st.checkbox(" ", key=checkbox_key, label_visibility="collapsed")
-        
-            # 체크 상태 반영
-            if st.session_state.get(checkbox_key, False):
+
+            if is_selected:
                 st.session_state[expander_key] = True
                 selected_articles.append(art)
 
-            # expander로 상세 내용 표시
-            with st.expander("내용 보기", expanded=st.session_state[expander_key]):
-                st.markdown(f"[원문 보기]({art['url']})")
-                dt_str = art["datetime"].strftime('%Y-%m-%d %H:%M') if "datetime" in art else ""
-                matched_kw = [kw for kw in selected_keywords if "content" in art and kw in art["content"]]
-                st.markdown(f"{art['source']} | {dt_str} | 필터링 키워드: {', '.join(matched_kw)}")
-                if "content" in art:
-                    st.markdown(highlight_keywords(art["content"], matched_kw).replace("\n", "<br>"), unsafe_allow_html=True)
-        
-            if is_selected:
-                selected_articles.append(art)
-                
         if selected_articles:
             st.subheader("📋 복사용 텍스트 (선택된 기사만)")
             text_block = "【사회면】\n"
@@ -372,7 +359,7 @@ if collect_wire:
                 text_block += f"△{row['title']}\n-{row['content'].strip()}\n\n"
             st.code(text_block.strip(), language="markdown")
             st.caption("✅ 복사 버튼을 눌러 선택한 기사 내용을 복사하세요.")
-        elif articles:
+        else:
             st.subheader("📋 복사용 텍스트 (선택된 기사 없음)")
             st.info("체크박스로 기사 선택 시 이 영역에 텍스트가 표시됩니다.")
 
@@ -384,22 +371,25 @@ if collect_naver:
     for idx, result in enumerate(naver_articles):
         expander_key = f"naver_expander_{idx}"
         checkbox_key = f"naver_chk_{idx}"
-    
+
         if expander_key not in st.session_state:
             st.session_state[expander_key] = False
-    
-        if st.session_state.get(checkbox_key, False):
+
+        # 제목과 체크박스를 같은 줄에 배치
+        col1, col2 = st.columns([0.92, 0.08])
+        with col1:
+            with st.expander(f"{result['매체']}/{result['제목']}", expanded=st.session_state[expander_key]):
+                st.markdown(f"[🔗 원문 보기]({result['링크']})", unsafe_allow_html=True)
+                st.caption(result["날짜"])
+                if result["필터일치"]:
+                    st.write(f"**일치 키워드:** {result['필터일치']}")
+                st.markdown(f"- {result['하이라이트']}", unsafe_allow_html=True)
+        with col2:
+            is_selected = st.checkbox(" ", key=checkbox_key, label_visibility="collapsed")
+
+        if is_selected:
             st.session_state[expander_key] = True
-    
-        with st.expander(f"{result['매체']}/{result['제목']}", expanded=st.session_state[expander_key]):
-            is_selected = st.checkbox("이 기사 선택", key=checkbox_key)
-            st.markdown(f"[🔗 원문 보기]({result['링크']})", unsafe_allow_html=True)
-            st.caption(result["날짜"])
-            if result["필터일치"]:
-                st.write(f"**일치 키워드:** {result['필터일치']}")
-            st.markdown(f"- {result['하이라이트']}", unsafe_allow_html=True)
-            if is_selected:
-                selected_naver_articles.append(result)
+            selected_naver_articles.append(result)
 
     if selected_naver_articles:
         st.subheader("📋 복사용 텍스트 (선택된 기사만)")
@@ -409,6 +399,6 @@ if collect_naver:
             text_block += f"△{row['매체']}/{clean_title}\n-{row['본문']}\n\n"
         st.code(text_block.strip(), language="markdown")
         st.caption("✅ 복사 버튼을 눌러 선택한 기사 내용을 복사하세요.")
-    elif naver_articles:
+    else:
         st.subheader("📋 복사용 텍스트 (선택된 기사 없음)")
         st.info("체크박스로 기사 선택 시 이 영역에 텍스트가 표시됩니다.")
