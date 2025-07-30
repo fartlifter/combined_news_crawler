@@ -14,7 +14,7 @@ client_secret = "49E810CBKY"
 
 st.set_page_config(page_title="단독·통신기사 수집기", layout="wide")
 st.title("📰 단독·통신기사 수집기")
-st.caption("세계일보 경찰팀 라인별 보고를 도와줍니다. (만든이: 윤준호, 업데이트: 250710)")
+st.caption("세계일보 경찰팀 라인별 보고를 도와줍니다. (만든이: 윤준호, 업데이트: 250730)")
 
 # === 키워드 그룹 (공통) ===
 keyword_groups = {
@@ -198,7 +198,7 @@ def naver_extract_media_name(url):
         media_mapping = {
             "chosun": "조선", "joongang": "중앙", "donga": "동아", "hani": "한겨레",
             "khan": "경향", "hankookilbo": "한국", "segye": "세계", "seoul": "서울",
-            "kmib": "국민", "munhwa": "문화", "kbs": "KBS", "sbs": "SBS", "www.mbn": "MBN",
+            "kmib": "국민", "munhwa": "문화", "kbs": "KBS", "sbs": "SBS", "mbn.co": "MBN",
             "imnews": "MBC", "jtbc": "JTBC", "ichannela": "채널A", "tvchosun": "TV조선",
             "mk": "매경", "sedaily": "서경", "hankyung": "한경", "news1": "뉴스1", "www.pressian": "프레시안", 
             "newsis": "뉴시스", "yna": "연합", "mt": "머투", "weekly": "주간조선", "www.imaeil": "매일신문",
