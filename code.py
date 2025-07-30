@@ -324,26 +324,35 @@ if collect_wire:
     st.header("◆통신기사")
     selected_articles = []
     articles = st.session_state.wire_articles
-    if articles:
         for i, art in enumerate(articles):
             expander_key = f"wire_expander_{i}"
             checkbox_key = f"wire_{i}"
         
-            # 초기 상태 설정
+            # 초기 확장 상태 설정
             if expander_key not in st.session_state:
                 st.session_state[expander_key] = False
         
-            # 기사 제목 + 체크박스를 한 줄에 나란히 출력
-            col1, col2 = st.columns([0.85, 0.15])
+            # 제목 + 체크박스를 한 줄에 표시 (비슷한 높이로)
+            col1, col2 = st.columns([0.92, 0.08])  # expander와 체크박스 너비 조절
             with col1:
-                st.markdown(f"**{art['title']}**")
+                with st.expander(art["title"], expanded=st.session_state[expander_key]):
+                    st.markdown(f"[원문 보기]({art['url']})")
+                    dt_str = art["datetime"].strftime('%Y-%m-%d %H:%M') if "datetime" in art else ""
+                    matched_kw = [kw for kw in selected_keywords if "content" in art and kw in art["content"]]
+                    st.markdown(f"{art['source']} | {dt_str} | 필터링 키워드: {', '.join(matched_kw)}")
+                    if "content" in art:
+                        st.markdown(
+                            highlight_keywords(art["content"], matched_kw).replace("\n", "<br>"),
+                            unsafe_allow_html=True
+                        )
             with col2:
-                is_selected = st.checkbox("선택", key=checkbox_key)
+                is_selected = st.checkbox(" ", key=checkbox_key, label_visibility="collapsed")
         
-            # 선택 여부에 따라 expander 열기
+            # 체크 상태 반영
             if st.session_state.get(checkbox_key, False):
                 st.session_state[expander_key] = True
-        
+                selected_articles.append(art)
+
             # expander로 상세 내용 표시
             with st.expander("내용 보기", expanded=st.session_state[expander_key]):
                 st.markdown(f"[원문 보기]({art['url']})")
